@@ -1,6 +1,5 @@
 import 'package:intl/intl.dart';
 import '../models/cart_item.dart';
-import 'database_service.dart';
 
 // Mock Printer Service สำหรับการทดสอบโดยไม่ต้องใช้ Sunmi Printer
 class PrinterService {
@@ -8,11 +7,9 @@ class PrinterService {
     print('🖨️ Printer initialized (Mock)');
   }
 
-  static Future<void> printReceipt(List<CartItem> cart, double total) async {
+  static Future<void> printReceipt(List<CartItem> cart, double total, String billNumber, String shopName) async {
     final transactionId = DateTime.now().millisecondsSinceEpoch;
     final date = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
-    final billNumber = await DatabaseService.generateBillNumber();
-    final shopName = await DatabaseService.getShopName();
 
     print('🧾 ========== RECEIPT ==========');
     print('🧾 $billNumber');
@@ -37,7 +34,6 @@ class PrinterService {
     print('🧾 Total: ${total.toStringAsFixed(2)}');
     print('🧾 ========== END ==========');
     
-    // แสดง Snackbar แจ้งเตือนว่าพิมพ์สำเร็จ (ใน real app)
-    print('✅ Receipt printed successfully (Mock)');
+    print('✅ Receipt $billNumber printed successfully (Mock)');
   }
 }

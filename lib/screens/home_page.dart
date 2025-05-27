@@ -10,6 +10,7 @@ import '../widgets/dialogs/add_product_dialog.dart';
 import '../widgets/dialogs/edit_quantity_dialog.dart';
 import 'product_list_page.dart';
 import 'settings_page.dart';
+import 'order_history_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,6 +26,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool _showGrid = true;
   TabController? _tabController;
   int _currentCategoryIndex = 0;
+  int _currentPage = 0; // For pagination
+  final int _itemsPerPage = 6; // Show 6 items per page
 
   @override
   void initState() {
@@ -58,6 +61,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           if (!_tabController!.indexIsChanging) {
             setState(() {
               _currentCategoryIndex = _tabController!.index;
+              _resetPageWhenCategoryChanged(); // Reset page when category changes
             });
           }
         });
@@ -78,6 +82,43 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
     final currentCategory = categories[_currentCategoryIndex];
     return products.where((p) => p.categoryId == currentCategory.id).toList();
+  }
+
+  List<Product> get paginatedProducts {
+    if (!_showGrid) return currentCategoryProducts; // No pagination when grid is hidden
+    
+    final startIndex = _currentPage * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, currentCategoryProducts.length);
+    
+    if (startIndex >= currentCategoryProducts.length) return [];
+    return currentCategoryProducts.sublist(startIndex, endIndex);
+  }
+
+  int get totalPages {
+    if (currentCategoryProducts.isEmpty) return 0;
+    return (currentCategoryProducts.length / _itemsPerPage).ceil();
+  }
+
+  void _goToNextPage() {
+    if (_currentPage < totalPages - 1) {
+      setState(() {
+        _currentPage++;
+      });
+    }
+  }
+
+  void _goToPreviousPage() {
+    if (_currentPage > 0) {
+      setState(() {
+        _currentPage--;
+      });
+    }
+  }
+
+  void _resetPageWhenCategoryChanged() {
+    setState(() {
+      _currentPage = 0;
+    });
   }
 
   Future<void> _addProduct(String name, double price, int categoryId) async {
@@ -121,7 +162,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _printReceipt() async {
-    await PrinterService.printReceipt(cart, total);
+    final billNumber = await DatabaseService.generateBillNumber();
+    final shopName = await DatabaseService.getShopName();
+    
+    // Save order to database BEFORE printing
+    await DatabaseService.saveOrder(cart, total, billNumber, shopName);
+    
+    // Print receipt with the same bill number
+    await PrinterService.printReceipt(cart, total, billNumber, shopName);
+    
     setState(() => cart.clear());
   }
 
@@ -144,6 +193,68 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  void _showQuickAddDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('เพิ่มสินค้า - ${categories[_currentCategoryIndex].title}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 1.8,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+            ),
+            itemCount: currentCategoryProducts.length,
+            itemBuilder: (context, index) {
+              final product = currentCategoryProducts[index];
+              return ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueGrey,
+                  padding: const EdgeInsets.all(6),
+                ),
+                onPressed: () {
+                  _addToCart(product);
+                  Navigator.of(context).pop();
+                },
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          product.name,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '฿${product.price.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 9, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ปิด'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,8 +262,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         title: const Text('KaffeePOS'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.print),
-            onPressed: cart.isEmpty ? null : _printReceipt,
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OrderHistoryPage()),
+              );
+            },
+            tooltip: 'ประวัติการสั่งซื้อ',
           ),
           IconButton(
             icon: const Icon(Icons.view_list),
@@ -164,18 +281,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               _loadProducts();
             },
           ),
-          IconButton(
-            onPressed: _showAddProductDialog,
-            icon: const Icon(Icons.add),
-          ),
           PopupMenuButton<String>(
-            onSelected: (value) {
+            onSelected: (value) async {
               switch (value) {
                 case 'settings':
-                  Navigator.push(
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsPage()),
-                  ).then((_) => _loadData()); // Reload data when returning from settings
+                  );
+                  _loadData();
                   break;
               }
             },
@@ -239,88 +353,159 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             )
           : Column(
               children: [
-                // Grid toggle button
+                // Grid toggle button (moved to minimal design)
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Row(
                     children: [
-                      IconButton(
-                        icon: Icon(_showGrid ? Icons.grid_view : Icons.list),
-                        onPressed: () {
-                          setState(() {
-                            _showGrid = !_showGrid;
-                          });
-                        },
-                        tooltip: _showGrid ? 'เปลี่ยนเป็นมุมมองรายการ' : 'เปลี่ยนเป็นมุมมองตาราง',
-                      ),
-                      const Spacer(),
-                      if (categories.isNotEmpty && _currentCategoryIndex < categories.length)
-                        Text(
-                          '${categories[_currentCategoryIndex].title} (${currentCategoryProducts.length} รายการ)',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
+                      const Spacer(), // Push buttons to the right
                     ],
                   ),
                 ),
 
-                // Product display area
-                Expanded(
-                  flex: 3,
-                  child: currentCategoryProducts.isEmpty
-                      ? const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey),
-                              SizedBox(height: 8),
-                              Text(
-                                'ไม่มีสินค้าในหมวดหมู่นี้',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _showGrid
-                          ? ProductGrid(
-                              products: currentCategoryProducts,
-                              onProductTap: _addToCart,
-                              scrollable: true,
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(8),
-                              itemCount: currentCategoryProducts.length,
-                              itemBuilder: (context, index) {
-                                final product = currentCategoryProducts[index];
-                                return Card(
-                                  child: ListTile(
-                                    title: Text(product.name),
-                                    subtitle: Text('฿${product.price.toStringAsFixed(2)}'),
-                                    trailing: ElevatedButton(
-                                      onPressed: () => _addToCart(product),
-                                      child: const Text('เพิ่ม'),
-                                    ),
-                                  ),
-                                );
-                              },
+                // Product display area (only show when _showGrid is true)
+                if (_showGrid)
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      children: [
+                        // Pagination controls
+                        if (totalPages > 1)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  onPressed: _currentPage > 0 ? _goToPreviousPage : null,
+                                  icon: const Icon(Icons.chevron_left),
+                                  tooltip: 'หน้าก่อน',
+                                ),
+                                Text(
+                                  '${_currentPage + 1} / $totalPages',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                                IconButton(
+                                  onPressed: _currentPage < totalPages - 1 ? _goToNextPage : null,
+                                  icon: const Icon(Icons.chevron_right),
+                                  tooltip: 'หน้าถัดไป',
+                                ),
+                              ],
                             ),
-                ),
+                          ),
+                        // Product grid
+                        Expanded(
+                          child: paginatedProducts.isEmpty
+                              ? const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'ไม่มีสินค้าในหมวดหมู่นี้',
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ProductGrid(
+                                  products: paginatedProducts,
+                                  onProductTap: _addToCart,
+                                  scrollable: false, // No scroll needed with pagination
+                                  compact: true, // New compact mode
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                const Divider(),
+                const Divider(height: 1),
 
-                // Cart area
+                // Cart area (expands when grid is hidden)
                 Expanded(
-                  flex: 2,
+                  flex: _showGrid ? 3 : 5,
                   child: Column(
                     children: [
-                      Expanded(
-                        child: CartList(
-                          cart: cart,
-                          onItemTap: _showEditQuantityDialog,
+                      // Cart header with Quick Add when grid is hidden
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.shopping_cart, color: Colors.blue, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'รายการสั่งซื้อ (${cart.length} รายการ)',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Spacer(),
+                                // Visibility toggle button
+                                IconButton(
+                                  icon: Icon(_showGrid ? Icons.visibility : Icons.visibility_off, size: 20),
+                                  onPressed: () {
+                                    setState(() {
+                                      _showGrid = !_showGrid;
+                                    });
+                                  },
+                                  tooltip: _showGrid ? 'ซ่อนปุ่มสินค้า' : 'แสดงปุ่มสินค้า',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 8),
+                                if (!_showGrid && currentCategoryProducts.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle, color: Colors.green, size: 20),
+                                    onPressed: () => _showQuickAddDialog(),
+                                    tooltip: 'เพิ่มสินค้าเร็ว',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                              ],
+                            ),
+                            // Quick add product list when grid is hidden - REMOVED
+                            // Only keep the add_circle button above
+                          ],
+                        ),
+                      ),
+                      // Cart list
+                      Expanded(
+                        child: cart.isEmpty
+                            ? const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.shopping_cart_outlined, size: 40, color: Colors.grey),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'ยังไม่มีรายการสั่งซื้อ',
+                                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : CartList(
+                                cart: cart,
+                                onItemTap: _showEditQuantityDialog,
+                              ),
                       ),
                       // Total
                       Container(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.all(12.0),
                         decoration: BoxDecoration(
                           color: Theme.of(context).cardColor,
                           boxShadow: [
@@ -337,17 +522,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             Text(
                               "รวม: ฿${total.toStringAsFixed(2)}",
                               style: const TextStyle(
-                                fontSize: 24,
+                                fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             ElevatedButton.icon(
                               onPressed: cart.isEmpty ? null : _printReceipt,
-                              icon: const Icon(Icons.print),
-                              label: const Text('พิมพ์'),
+                              icon: const Icon(Icons.print, size: 18),
+                              label: const Text('พิมพ์', style: TextStyle(fontSize: 14)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               ),
                             ),
                           ],

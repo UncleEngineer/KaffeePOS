@@ -4,11 +4,13 @@ import '../../models/cart_item.dart';
 class EditQuantityDialog extends StatefulWidget {
   final CartItem cartItem;
   final void Function(int quantity) onUpdate;
+  final VoidCallback? onDelete; // เพิ่ม callback สำหรับการลบ
 
   const EditQuantityDialog({
     super.key,
     required this.cartItem,
     required this.onUpdate,
+    this.onDelete, // เพิ่ม parameter สำหรับการลบ
   });
 
   @override
@@ -48,32 +50,82 @@ class _EditQuantityDialogState extends State<EditQuantityDialog> {
     Navigator.of(context).pop();
   }
 
+  void _handleDelete() {
+    // แสดง confirmation dialog ก่อนลบ
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('ยืนยันการลบ'),
+          content: Text('คุณต้องการลบ "${widget.cartItem.product.name}" ออกจากตะกร้าหรือไม่?'),
+          actions: [
+            TextButton(
+              child: const Text('ยกเลิก'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('ลบ'),
+              onPressed: () {
+                Navigator.of(context).pop(); // ปิด confirmation dialog
+                Navigator.of(context).pop(); // ปิด edit quantity dialog
+                widget.onDelete?.call(); // เรียก callback สำหรับลบ
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('แก้ไขจำนวน "${widget.cartItem.product.name}"'),
-      content: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.remove),
-            onPressed: _decreaseQuantity,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove),
+                onPressed: _decreaseQuantity,
+              ),
+              SizedBox(
+                width: 60,
+                child: TextField(
+                  controller: controller,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _increaseQuantity,
+              ),
+            ],
           ),
-          SizedBox(
-            width: 60,
-            child: TextField(
-              controller: controller,
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
+          const SizedBox(height: 16),
+          // ปุ่มลบสินค้าออกจากตะกร้า
+          if (widget.onDelete != null)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                label: const Text('ลบออกจากตะกร้า', style: TextStyle(color: Colors.red)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                ),
+                onPressed: _handleDelete,
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _increaseQuantity,
-          ),
         ],
       ),
       actions: [

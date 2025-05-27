@@ -3,6 +3,8 @@ import 'package:path/path.dart';
 import 'package:intl/intl.dart';
 import '../models/product.dart';
 import '../models/category.dart';
+import '../models/order.dart';
+import '../models/cart_item.dart';
 
 class DatabaseService {
   static Database? _database;
@@ -43,6 +45,25 @@ class DatabaseService {
           key TEXT PRIMARY KEY,
           value TEXT
         )''');
+
+        // Create orders table
+        await db.execute('''CREATE TABLE orders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          bill_number TEXT NOT NULL,
+          date TEXT NOT NULL,
+          total REAL NOT NULL,
+          shop_name TEXT NOT NULL
+        )''');
+
+        // Create order_items table
+        await db.execute('''CREATE TABLE order_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          order_id INTEGER NOT NULL,
+          product_name TEXT NOT NULL,
+          product_price REAL NOT NULL,
+          quantity INTEGER NOT NULL,
+          FOREIGN KEY (order_id) REFERENCES orders (id)
+        )''');
         
         // Insert default shop name
         await db.insert('settings', {'key': 'shop_name', 'value': 'Uncle Coffee Shop'});
@@ -59,7 +80,6 @@ class DatabaseService {
             value TEXT
           )''');
           
-          // Check if shop_name already exists
           final result = await db.query('settings', where: 'key = ?', whereArgs: ['shop_name']);
           if (result.isEmpty) {
             await db.insert('settings', {'key': 'shop_name', 'value': 'Uncle Coffee Shop'});
@@ -67,7 +87,6 @@ class DatabaseService {
         }
         
         if (oldVersion < 3) {
-          // Create categories table
           await db.execute('''CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -75,10 +94,8 @@ class DatabaseService {
             color_code TEXT NOT NULL
           )''');
           
-          // Add category_id to products table
           await db.execute('ALTER TABLE products ADD COLUMN category_id INTEGER DEFAULT 1');
           
-          // Insert default categories if not exist
           final categoryResult = await db.query('categories');
           if (categoryResult.isEmpty) {
             await db.insert('categories', {'title': 'ทั่วไป', 'code': 'GEN', 'color_code': '#2196F3'});
@@ -86,11 +103,30 @@ class DatabaseService {
             await db.insert('categories', {'title': 'อาหาร', 'code': 'FOOD', 'color_code': '#FF9800'});
           }
         }
+
+        if (oldVersion < 4) {
+          await db.execute('''CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bill_number TEXT NOT NULL,
+            date TEXT NOT NULL,
+            total REAL NOT NULL,
+            shop_name TEXT NOT NULL
+          )''');
+
+          await db.execute('''CREATE TABLE IF NOT EXISTS order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            product_name TEXT NOT NULL,
+            product_price REAL NOT NULL,
+            quantity INTEGER NOT NULL,
+            FOREIGN KEY (order_id) REFERENCES orders (id)
+          )''');
+        }
       },
-      version: 3,
+      version: 4,
     );
     
-    // Ensure tables exist (for existing databases)
+    // Ensure all tables exist
     await db.execute('''CREATE TABLE IF NOT EXISTS bills (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT
@@ -107,14 +143,30 @@ class DatabaseService {
       code TEXT NOT NULL,
       color_code TEXT NOT NULL
     )''');
+
+    await db.execute('''CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bill_number TEXT NOT NULL,
+      date TEXT NOT NULL,
+      total REAL NOT NULL,
+      shop_name TEXT NOT NULL
+    )''');
+
+    await db.execute('''CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      product_price REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES orders (id)
+    )''');
     
-    // Insert default shop name if not exists
+    // Insert defaults if not exist
     final shopNameResult = await db.query('settings', where: 'key = ?', whereArgs: ['shop_name']);
     if (shopNameResult.isEmpty) {
       await db.insert('settings', {'key': 'shop_name', 'value': 'Uncle Coffee Shop'});
     }
     
-    // Insert default categories if not exist
     final categoryResult = await db.query('categories');
     if (categoryResult.isEmpty) {
       await db.insert('categories', {'title': 'ทั่วไป', 'code': 'GEN', 'color_code': '#2196F3'});
@@ -194,7 +246,6 @@ class DatabaseService {
 
   static Future<void> deleteCategory(Category category) async {
     final db = await database;
-    // First check if there are products using this category
     final products = await db.query('products', where: 'category_id = ?', whereArgs: [category.id]);
     if (products.isNotEmpty) {
       throw Exception('ไม่สามารถลบหมวดหมู่ที่มีสินค้าอยู่ได้');
@@ -202,23 +253,88 @@ class DatabaseService {
     await db.delete('categories', where: 'id = ?', whereArgs: [category.id]);
   }
 
+  // Order methods
+  static Future<void> saveOrder(List<CartItem> cart, double total, String billNumber, String shopName) async {
+    final db = await database;
+    
+    // Insert order
+    final orderId = await db.insert('orders', {
+      'bill_number': billNumber,
+      'date': DateTime.now().toIso8601String(),
+      'total': total,
+      'shop_name': shopName,
+    });
+
+    // Insert order items
+    for (final item in cart) {
+      await db.insert('order_items', {
+        'order_id': orderId,
+        'product_name': item.product.name,
+        'product_price': item.product.price,
+        'quantity': item.quantity,
+      });
+    }
+  }
+
+  static Future<List<Order>> getOrders({String? searchQuery}) async {
+    final db = await database;
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      // Allow searching by bill number (with or without #)
+      String cleanQuery = searchQuery.replaceAll('#', '');
+      whereClause = 'WHERE bill_number LIKE ?';
+      whereArgs = ['%$cleanQuery%'];
+    }
+
+    final List<Map<String, dynamic>> orderMaps = await db.rawQuery('''
+      SELECT * FROM orders 
+      $whereClause
+      ORDER BY date DESC
+    ''', whereArgs);
+
+    List<Order> orders = [];
+    for (final orderMap in orderMaps) {
+      final itemMaps = await db.query(
+        'order_items',
+        where: 'order_id = ?',
+        whereArgs: [orderMap['id']],
+      );
+      
+      final items = itemMaps.map((itemMap) => OrderItem.fromMap(itemMap)).toList();
+      orders.add(Order.fromMap(orderMap, items));
+    }
+
+    return orders;
+  }
+
+  static Future<Order?> getOrderById(int id) async {
+    final db = await database;
+    final orderMaps = await db.query('orders', where: 'id = ?', whereArgs: [id]);
+    
+    if (orderMaps.isEmpty) return null;
+
+    final itemMaps = await db.query('order_items', where: 'order_id = ?', whereArgs: [id]);
+    final items = itemMaps.map((itemMap) => OrderItem.fromMap(itemMap)).toList();
+    
+    return Order.fromMap(orderMaps.first, items);
+  }
+
   static Future<String> generateBillNumber() async {
     final db = await database;
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    // Count how many bills exist for today
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM bills WHERE date = ?',
       [today],
     );
 
     int count = Sqflite.firstIntValue(result) ?? 0;
-
-    // Insert a new bill entry
     await db.insert('bills', {'date': today});
 
     int billNumber = count + 1;
-    return '#${billNumber.toString().padLeft(4, '0')}'; // #0001, #0002...
+    return '#${billNumber.toString().padLeft(4, '0')}';
   }
 
   // Settings methods
@@ -228,7 +344,7 @@ class DatabaseService {
     if (result.isNotEmpty) {
       return result.first['value'] as String;
     }
-    return 'Uncle Coffee Shop'; // Default fallback
+    return 'Uncle Coffee Shop';
   }
 
   static Future<void> setShopName(String shopName) async {

@@ -69,6 +69,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return AlertDialog(
       title: const Text('เพิ่มสินค้า'),
       content: isLoading
@@ -76,93 +78,107 @@ class _AddProductDialogState extends State<AddProductDialog> {
               height: 100,
               child: Center(child: CircularProgressIndicator()),
             )
-          : SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'ชื่อสินค้า',
-                      border: OutlineInputBorder(),
+          : ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: screenHeight * 0.6, // Responsive height
+                maxWidth: double.maxFinite,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'ชื่อสินค้า',
+                        border: OutlineInputBorder(),
+                        hintText: 'กรอกชื่อสินค้า',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: priceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'ราคา',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: priceController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'ราคา',
+                        border: OutlineInputBorder(),
+                        hintText: 'กรอกราคาสินค้า',
+                        prefixText: '฿ ',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<Category>(
-                    value: selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'หมวดหมู่',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: categories.map((category) {
-                      return DropdownMenuItem<Category>(
-                        value: category,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: category.color,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  category.code,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold,
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<Category>(
+                      value: selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'หมวดหมู่',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: categories.map((category) {
+                        return DropdownMenuItem<Category>(
+                          value: category,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: category.color,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    category.code,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(category.title),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (Category? value) {
-                      setState(() {
-                        selectedCategory = value;
-                      });
-                    },
-                  ),
-                  if (categories.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange[200]!),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.warning, color: Colors.orange),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'ยังไม่มีหมวดหมู่ในระบบ กรุณาเพิ่มหมวดหมู่ก่อน',
-                                style: TextStyle(color: Colors.orange),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  category.title,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (Category? value) {
+                        setState(() {
+                          selectedCategory = value;
+                        });
+                      },
+                    ),
+                    if (categories.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange[200]!),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.warning, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'ยังไม่มีหมวดหมู่ในระบบ กรุณาเพิ่มหมวดหมู่ก่อน',
+                                  style: TextStyle(color: Colors.orange),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
       actions: [
@@ -172,6 +188,10 @@ class _AddProductDialogState extends State<AddProductDialog> {
         ),
         ElevatedButton(
           onPressed: categories.isEmpty ? null : _handleAdd,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
           child: const Text('เพิ่ม'),
         ),
       ],

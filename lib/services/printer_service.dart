@@ -3,7 +3,6 @@ import 'package:sunmi_printer_plus/enums.dart';
 import 'package:sunmi_printer_plus/sunmi_style.dart';
 import 'package:intl/intl.dart';
 import '../models/cart_item.dart';
-import 'database_service.dart';
 
 class PrinterService {
   static Future<void> initialize() async {
@@ -12,11 +11,9 @@ class PrinterService {
     await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
   }
 
-  static Future<void> printReceipt(List<CartItem> cart, double total) async {
+  static Future<void> printReceipt(List<CartItem> cart, double total, String billNumber, String shopName) async {
     final transactionId = DateTime.now().millisecondsSinceEpoch;
     final date = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
-    final billNumber = await DatabaseService.generateBillNumber();
-    final shopName = await DatabaseService.getShopName();
 
     await initialize();
     await SunmiPrinter.startTransactionPrint(true);
