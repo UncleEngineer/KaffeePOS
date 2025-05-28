@@ -157,8 +157,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   void _updateCartItemQuantity(int index, int quantity) {
     setState(() {
-      cart[index].quantity = quantity;
+      if (quantity > 0) {
+        cart[index].quantity = quantity;
+      } else {
+        // ถ้าจำนวนเป็น 0 หรือน้อยกว่า ให้ลบสินค้าออกจากตะกร้า
+        cart.removeAt(index);
+      }
     });
+  }
+
+  // เพิ่มฟังก์ชันสำหรับลบสินค้าออกจากตะกร้า
+  void _removeCartItem(int index) {
+    setState(() {
+      cart.removeAt(index);
+    });
+    
+    // แสดงข้อความแจ้งเตือน
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('ลบสินค้าออกจากตะกร้าแล้ว'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.orange,
+      ),
+    );
   }
 
   Future<void> _printReceipt() async {
@@ -189,6 +210,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       builder: (context) => EditQuantityDialog(
         cartItem: cart[index],
         onUpdate: (quantity) => _updateCartItemQuantity(index, quantity),
+        onDelete: () => _removeCartItem(index), // เชื่อมต่อฟังก์ชันลบ
       ),
     );
   }
