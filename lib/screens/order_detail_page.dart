@@ -7,29 +7,33 @@ import '../models/product.dart';
 
 class OrderDetailPage extends StatelessWidget {
   final Order order;
+  final Function(Order)? onEditOrder;
 
-  const OrderDetailPage({
-    super.key,
-    required this.order,
-  });
+  const OrderDetailPage({super.key, required this.order, this.onEditOrder});
 
   Future<void> _reprintOrder(BuildContext context) async {
     try {
       // Convert OrderItems back to CartItems for printing
-      List<CartItem> cartItems = order.items.map((orderItem) {
-        // Create a temporary product for printing
-        final product = Product(
-          id: 0, // Temporary ID
-          name: orderItem.productName,
-          price: orderItem.productPrice,
-          categoryId: 1, // Default category
-        );
-        return CartItem(product, quantity: orderItem.quantity);
-      }).toList();
+      List<CartItem> cartItems =
+          order.items.map((orderItem) {
+            // Create a temporary product for printing
+            final product = Product(
+              id: 0, // Temporary ID
+              name: orderItem.productName,
+              price: orderItem.productPrice,
+              categoryId: 1, // Default category
+            );
+            return CartItem(product, quantity: orderItem.quantity);
+          }).toList();
 
       // Use the original bill number and shop name from the order
-      await PrinterService.printReceipt(cartItems, order.total, order.billNumber, order.shopName);
-      
+      await PrinterService.printReceipt(
+        cartItems,
+        order.total,
+        order.billNumber,
+        order.shopName,
+      );
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -50,6 +54,46 @@ class OrderDetailPage extends StatelessWidget {
     }
   }
 
+  void _editOrder(BuildContext context) {
+    // แสดง confirmation dialog ก่อนแก้ไข
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('แก้ไขออร์เดอร์'),
+          content: Text(
+            'คุณต้องการแก้ไขออร์เดอร์ ${order.billNumber} หรือไม่?\n\n'
+            'การแก้ไขจะนำคุณกลับไปยังหน้าหลักพร้อมสินค้าที่อยู่ในออร์เดอร์นี้',
+          ),
+          actions: [
+            TextButton(
+              child: const Text('ยกเลิก'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('แก้ไข'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(); // ปิด dialog
+
+                // เรียก callback เพื่อแก้ไขออร์เดอร์
+                if (onEditOrder != null) {
+                  onEditOrder!(order);
+                } else {
+                  // ถ้าไม่มี callback ให้ส่งผลลัพธ์กลับผ่าน Navigator
+                  Navigator.of(context).pop(order);
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   String _formatDate(DateTime date) {
     return DateFormat('dd/MM/yyyy HH:mm').format(date);
   }
@@ -65,6 +109,12 @@ class OrderDetailPage extends StatelessWidget {
             onPressed: () => _reprintOrder(context),
             tooltip: 'พิมพ์ใบเสร็จซ้ำ',
           ),
+          if (onEditOrder != null)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _editOrder(context),
+              tooltip: 'แก้ไขออร์เดอร์',
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -98,7 +148,7 @@ class OrderDetailPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // QR Code placeholder
                   Container(
                     width: 80,
@@ -125,20 +175,17 @@ class OrderDetailPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   Text(
                     'Date: ${_formatDate(order.date)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.black),
                   ),
                   const SizedBox(height: 24),
 
                   // Items list
                   const Divider(color: Colors.black),
                   const SizedBox(height: 8),
-                  
+
                   for (final item in order.items) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -175,11 +222,11 @@ class OrderDetailPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  
+
                   const SizedBox(height: 8),
                   const Divider(color: Colors.black),
                   const SizedBox(height: 8),
-                  
+
                   // Total
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -205,25 +252,50 @@ class OrderDetailPage extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // Reprint button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _reprintOrder(context),
-                icon: const Icon(Icons.print),
-                label: const Text(
-                  'พิมพ์ใบเสร็จซ้ำ',
-                  style: TextStyle(fontSize: 16),
+
+            // Action buttons
+            Column(
+              children: [
+                // Reprint button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _reprintOrder(context),
+                    icon: const Icon(Icons.print),
+                    label: const Text(
+                      'พิมพ์ใบเสร็จซ้ำ',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+
+                const SizedBox(height: 12),
+
+                // Edit order button - แสดงเสมอ
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _editOrder(context),
+                    icon: const Icon(Icons.edit),
+                    label: const Text(
+                      'แก้ไขออร์เดอร์',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
