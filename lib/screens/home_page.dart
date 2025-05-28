@@ -407,29 +407,7 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Text('KaffeePOS'),
-            if (_editingOrder != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'แก้ไข: $_editingBillNumber',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+        title: const Text('KaffeePOS'),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -650,10 +628,7 @@ class _HomePageState extends State<HomePage>
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                _editingOrder != null
-                                    ? Colors.orange[50]
-                                    : Theme.of(context).cardColor,
+                            color: Theme.of(context).cardColor,
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.1),
@@ -778,10 +753,7 @@ class _HomePageState extends State<HomePage>
                         Container(
                           padding: const EdgeInsets.all(12.0),
                           decoration: BoxDecoration(
-                            color:
-                                _editingOrder != null
-                                    ? Colors.orange[50]
-                                    : Theme.of(context).cardColor,
+                            color: Theme.of(context).cardColor,
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.1),
