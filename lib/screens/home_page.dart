@@ -504,306 +504,317 @@ class _HomePageState extends State<HomePage>
                 )
                 : null,
       ),
-      body:
-          categories.isEmpty
-              ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.category_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'ยังไม่มีหมวดหมู่สินค้า',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'กรุณาไปที่การตั้งค่าเพื่อเพิ่มหมวดหมู่',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
-              : Column(
-                children: [
-                  // Grid toggle button (moved to minimal design)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Row(
-                      children: [
-                        const Spacer(), // Push buttons to the right
-                      ],
-                    ),
+      body: SafeArea(
+        bottom: true,
+        top: false,
+        left: false,
+        right: false,
+        child:
+            categories.isEmpty
+                ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.category_outlined,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'ยังไม่มีหมวดหมู่สินค้า',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'กรุณาไปที่การตั้งค่าเพื่อเพิ่มหมวดหมู่',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
+                )
+                : Column(
+                  children: [
+                    // Grid toggle button (moved to minimal design)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Row(
+                        children: [
+                          const Spacer(), // Push buttons to the right
+                        ],
+                      ),
+                    ),
 
-                  // Product display area (only show when _showGrid is true)
-                  if (_showGrid)
+                    // Product display area (only show when _showGrid is true)
+                    if (_showGrid)
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            // Pagination controls
+                            if (totalPages > 1)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 3,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      onPressed:
+                                          _currentPage > 0
+                                              ? _goToPreviousPage
+                                              : null,
+                                      icon: const Icon(Icons.chevron_left),
+                                      tooltip: 'หน้าก่อน',
+                                    ),
+                                    Text(
+                                      '${_currentPage + 1} / $totalPages',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed:
+                                          _currentPage < totalPages - 1
+                                              ? _goToNextPage
+                                              : null,
+                                      icon: const Icon(Icons.chevron_right),
+                                      tooltip: 'หน้าถัดไป',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // Product grid
+                            Expanded(
+                              child:
+                                  paginatedProducts.isEmpty
+                                      ? const Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.inventory_2_outlined,
+                                              size: 48,
+                                              color: Colors.grey,
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              'ไม่มีสินค้าในหมวดหมู่นี้',
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                      : ProductGrid(
+                                        products: paginatedProducts,
+                                        onProductTap: _addToCart,
+                                        scrollable:
+                                            false, // No scroll needed with pagination
+                                        compact: true, // New compact mode
+                                      ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const Divider(height: 1),
+
+                    // Cart area (expands when grid is hidden)
                     Expanded(
-                      flex: 2,
+                      flex: _showGrid ? 3 : 5,
                       child: Column(
                         children: [
-                          // Pagination controls
-                          if (totalPages > 1)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 3,
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  IconButton(
-                                    onPressed:
-                                        _currentPage > 0
-                                            ? _goToPreviousPage
-                                            : null,
-                                    icon: const Icon(Icons.chevron_left),
-                                    tooltip: 'หน้าก่อน',
-                                  ),
-                                  Text(
-                                    '${_currentPage + 1} / $totalPages',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    onPressed:
-                                        _currentPage < totalPages - 1
-                                            ? _goToNextPage
-                                            : null,
-                                    icon: const Icon(Icons.chevron_right),
-                                    tooltip: 'หน้าถัดไป',
-                                  ),
-                                ],
-                              ),
+                          // Cart header with Quick Add when grid is hidden
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
                             ),
-                          // Product grid
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 2,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _editingOrder != null
+                                          ? Icons.edit
+                                          : Icons.shopping_cart,
+                                      color:
+                                          _editingOrder != null
+                                              ? Colors.orange
+                                              : Colors.blue,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _editingOrder != null
+                                            ? 'แก้ไขออร์เดอร์ $_editingBillNumber (${cart.length} รายการ)'
+                                            : 'รายการสั่งซื้อ (${cart.length} รายการ)',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    // Visibility toggle button
+                                    IconButton(
+                                      icon: Icon(
+                                        _showGrid
+                                            ? Icons.visibility
+                                            : Icons.visibility_off,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _showGrid = !_showGrid;
+                                        });
+                                      },
+                                      tooltip:
+                                          _showGrid
+                                              ? 'ซ่อนปุ่มสินค้า'
+                                              : 'แสดงปุ่มสินค้า',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (!_showGrid &&
+                                        currentCategoryProducts.isNotEmpty)
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle,
+                                          color: Colors.green,
+                                          size: 20,
+                                        ),
+                                        onPressed: () => _showQuickAddDialog(),
+                                        tooltip: 'เพิ่มสินค้าเร็ว',
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    if (_editingOrder != null)
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.close,
+                                          color: Colors.red,
+                                          size: 20,
+                                        ),
+                                        onPressed: _cancelOrderEdit,
+                                        tooltip: 'ยกเลิกการแก้ไข',
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Cart list
                           Expanded(
                             child:
-                                paginatedProducts.isEmpty
-                                    ? const Center(
+                                cart.isEmpty
+                                    ? Center(
                                       child: Column(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            Icons.inventory_2_outlined,
-                                            size: 48,
+                                            _editingOrder != null
+                                                ? Icons.edit_outlined
+                                                : Icons.shopping_cart_outlined,
+                                            size: 40,
                                             color: Colors.grey,
                                           ),
-                                          SizedBox(height: 8),
+                                          const SizedBox(height: 8),
                                           Text(
-                                            'ไม่มีสินค้าในหมวดหมู่นี้',
-                                            style: TextStyle(
+                                            _editingOrder != null
+                                                ? 'ออร์เดอร์ว่าง - เพิ่มสินค้าเพื่อแก้ไข'
+                                                : 'ยังไม่มีรายการสั่งซื้อ',
+                                            style: const TextStyle(
                                               color: Colors.grey,
+                                              fontSize: 14,
                                             ),
                                           ),
                                         ],
                                       ),
                                     )
-                                    : ProductGrid(
-                                      products: paginatedProducts,
-                                      onProductTap: _addToCart,
-                                      scrollable:
-                                          false, // No scroll needed with pagination
-                                      compact: true, // New compact mode
+                                    : CartList(
+                                      cart: cart,
+                                      onItemTap: _showEditQuantityDialog,
                                     ),
+                          ),
+                          // Total
+                          Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, -2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "รวม: ฿${total.toStringAsFixed(2)}",
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed:
+                                      cart.isEmpty ? null : _printReceipt,
+                                  icon: Icon(
+                                    _editingOrder != null
+                                        ? Icons.update
+                                        : Icons.print,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    _editingOrder != null ? 'อัพเดท' : 'พิมพ์',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        _editingOrder != null
+                                            ? Colors.orange
+                                            : Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-
-                  const Divider(height: 1),
-
-                  // Cart area (expands when grid is hidden)
-                  Expanded(
-                    flex: _showGrid ? 3 : 5,
-                    child: Column(
-                      children: [
-                        // Cart header with Quick Add when grid is hidden
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    _editingOrder != null
-                                        ? Icons.edit
-                                        : Icons.shopping_cart,
-                                    color:
-                                        _editingOrder != null
-                                            ? Colors.orange
-                                            : Colors.blue,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _editingOrder != null
-                                          ? 'แก้ไขออร์เดอร์ $_editingBillNumber (${cart.length} รายการ)'
-                                          : 'รายการสั่งซื้อ (${cart.length} รายการ)',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  // Visibility toggle button
-                                  IconButton(
-                                    icon: Icon(
-                                      _showGrid
-                                          ? Icons.visibility
-                                          : Icons.visibility_off,
-                                      size: 20,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _showGrid = !_showGrid;
-                                      });
-                                    },
-                                    tooltip:
-                                        _showGrid
-                                            ? 'ซ่อนปุ่มสินค้า'
-                                            : 'แสดงปุ่มสินค้า',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (!_showGrid &&
-                                      currentCategoryProducts.isNotEmpty)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.add_circle,
-                                        color: Colors.green,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _showQuickAddDialog(),
-                                      tooltip: 'เพิ่มสินค้าเร็ว',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  if (_editingOrder != null)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.close,
-                                        color: Colors.red,
-                                        size: 20,
-                                      ),
-                                      onPressed: _cancelOrderEdit,
-                                      tooltip: 'ยกเลิกการแก้ไข',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Cart list
-                        Expanded(
-                          child:
-                              cart.isEmpty
-                                  ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          _editingOrder != null
-                                              ? Icons.edit_outlined
-                                              : Icons.shopping_cart_outlined,
-                                          size: 40,
-                                          color: Colors.grey,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          _editingOrder != null
-                                              ? 'ออร์เดอร์ว่าง - เพิ่มสินค้าเพื่อแก้ไข'
-                                              : 'ยังไม่มีรายการสั่งซื้อ',
-                                          style: const TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  : CartList(
-                                    cart: cart,
-                                    onItemTap: _showEditQuantityDialog,
-                                  ),
-                        ),
-                        // Total
-                        Container(
-                          padding: const EdgeInsets.all(12.0),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, -2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "รวม: ฿${total.toStringAsFixed(2)}",
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: cart.isEmpty ? null : _printReceipt,
-                                icon: Icon(
-                                  _editingOrder != null
-                                      ? Icons.update
-                                      : Icons.print,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  _editingOrder != null ? 'อัพเดท' : 'พิมพ์',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      _editingOrder != null
-                                          ? Colors.orange
-                                          : Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+      ),
     );
   }
 }
