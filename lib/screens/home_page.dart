@@ -29,7 +29,8 @@ class _HomePageState extends State<HomePage>
   TabController? _tabController;
   int _currentCategoryIndex = 0;
   int _currentPage = 0; // For pagination
-  final int _itemsPerPage = 6; // Show 6 items per page
+  int _itemsPerPage =
+      6; // Changed from final to int - will be updated based on grid settings
 
   // สำหรับการแก้ไขออร์เดอร์
   Order? _editingOrder;
@@ -50,6 +51,35 @@ class _HomePageState extends State<HomePage>
   Future<void> _loadData() async {
     await _loadCategories();
     await _loadProducts();
+    await _loadGridSettings(); // Load grid settings after loading data
+  }
+
+  // Load grid settings from database
+  Future<void> _loadGridSettings() async {
+    final gridLayout = await DatabaseService.getSetting(
+      'grid_layout',
+      defaultValue: '3x2',
+    );
+    setState(() {
+      _itemsPerPage = _getItemsPerPage(gridLayout);
+      _currentPage = 0; // Reset page when grid settings change
+    });
+  }
+
+  // Calculate items per page based on grid layout
+  int _getItemsPerPage(String layout) {
+    switch (layout) {
+      case '3x2':
+        return 6; // 3 columns x 2 rows
+      case '3x3':
+        return 9; // 3 columns x 3 rows
+      case '4x2':
+        return 8; // 4 columns x 2 rows
+      case '4x3':
+        return 12; // 4 columns x 3 rows
+      default:
+        return 6;
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -455,7 +485,7 @@ class _HomePageState extends State<HomePage>
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsPage()),
                   );
-                  _loadData();
+                  _loadData(); // Reload data and grid settings
                   break;
               }
             },
@@ -615,7 +645,7 @@ class _HomePageState extends State<HomePage>
                                         products: paginatedProducts,
                                         onProductTap: _addToCart,
                                         scrollable:
-                                            false, // No scroll needed with pagination
+                                            true, // No scroll needed with pagination
                                         compact: true, // New compact mode
                                       ),
                             ),
