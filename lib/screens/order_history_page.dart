@@ -16,6 +16,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
   List<Order> orders = [];
   List<Order> filteredOrders = [];
   bool isLoading = true;
+  bool isScanning = false;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -67,9 +68,26 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
   }
 
   Future<void> _scanQRCode() async {
+    if (isScanning) return; // ป้องกันการสแกนซ้ำ
+
+    setState(() {
+      isScanning = true;
+    });
+
     try {
+      // แสดงข้อความแจ้งให้ผู้ใช้เตรียมสแกน
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเตรียมสแกน QR Code บนใบเสร็จ'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // เริ่มการสแกนด้วย Mobile Scanner (Camera)
       final result = await QRScannerService.scanQRCode(context);
-      if (result != null) {
+
+      if (result != null && result.isNotEmpty) {
         // นำผลลัพธ์ไปใส่ในช่องค้นหา
         _searchController.text = result;
         _filterOrders(result);
@@ -93,9 +111,20 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
               SnackBar(
                 content: Text('ไม่พบบิลหมายเลข $result'),
                 backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
               ),
             );
           }
+        }
+      } else {
+        // ไม่พบข้อมูลจากการสแกน
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ไม่พบข้อมูล QR Code หรือยกเลิกการสแกน'),
+              backgroundColor: Colors.grey,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -104,8 +133,15 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
           SnackBar(
             content: Text('เกิดข้อผิดพลาดในการสแกน QR Code: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isScanning = false;
+        });
       }
     }
   }
@@ -144,13 +180,16 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
         title: const Text('ประวัติการสั่งซื้อ'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: _scanQRCode,
-            tooltip: 'สแกน QR Code',
+            icon: Icon(
+              isScanning ? Icons.hourglass_empty : Icons.qr_code_scanner,
+              color: isScanning ? Colors.orange : null,
+            ),
+            onPressed: isScanning ? null : _scanQRCode,
+            tooltip: isScanning ? 'กำลังสแกน...' : 'สแกน QR Code',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadOrders,
+            onPressed: isLoading ? null : _loadOrders,
             tooltip: 'รีเฟรช',
           ),
         ],
@@ -177,25 +216,63 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                 const SizedBox(width: 8),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.blue,
+                    color: isScanning ? Colors.orange : Colors.blue,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: IconButton(
-                    icon: const Icon(
-                      Icons.qr_code_scanner,
+                    icon: Icon(
+                      isScanning
+                          ? Icons.hourglass_empty
+                          : Icons.qr_code_scanner,
                       color: Colors.white,
                     ),
-                    onPressed: _scanQRCode,
-                    tooltip: 'สแกน QR Code',
+                    onPressed: isScanning ? null : _scanQRCode,
+                    tooltip: isScanning ? 'กำลังสแกน...' : 'สแกน QR Code',
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: isScanning ? Colors.orange : Colors.blue,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey,
+                      disabledForegroundColor: Colors.white70,
                     ),
                   ),
                 ),
               ],
             ),
           ),
+
+          // Scanning indicator
+          if (isScanning)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.orange.withOpacity(0.1),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'กำลังเตรียมสแกน QR Code... กรุณาจ่อสแกนเนอร์ที่ QR Code',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Orders list
           Expanded(
@@ -227,12 +304,21 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                           if (_searchController.text.isEmpty) ...[
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
-                              onPressed: _scanQRCode,
-                              icon: const Icon(Icons.qr_code_scanner),
-                              label: const Text('สแกน QR Code'),
+                              onPressed: isScanning ? null : _scanQRCode,
+                              icon: Icon(
+                                isScanning
+                                    ? Icons.hourglass_empty
+                                    : Icons.qr_code_scanner,
+                              ),
+                              label: Text(
+                                isScanning ? 'กำลังสแกน...' : 'สแกน QR Code',
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                                backgroundColor:
+                                    isScanning ? Colors.orange : Colors.blue,
                                 foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey,
+                                disabledForegroundColor: Colors.white70,
                               ),
                             ),
                           ],
@@ -301,9 +387,13 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _scanQRCode,
-        tooltip: 'สแกน QR Code',
-        child: const Icon(Icons.qr_code_scanner),
+        onPressed: isScanning ? null : _scanQRCode,
+        tooltip: isScanning ? 'กำลังสแกน...' : 'สแกน QR Code',
+        backgroundColor: isScanning ? Colors.orange : Colors.blue,
+        child: Icon(
+          isScanning ? Icons.hourglass_empty : Icons.qr_code_scanner,
+          color: Colors.white,
+        ),
       ),
     );
   }

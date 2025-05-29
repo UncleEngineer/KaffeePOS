@@ -25,6 +25,14 @@ class QRScannerService {
       MaterialPageRoute(builder: (context) => const QRScannerPage()),
     );
   }
+
+  static Future<String?> scanWithTimeout(
+    BuildContext context, {
+    int timeoutSeconds = 30,
+    bool showSuccessMessage = true,
+  }) async {
+    return await scanQRCode(context);
+  }
 }
 
 class QRScannerPage extends StatefulWidget {
@@ -36,7 +44,67 @@ class QRScannerPage extends StatefulWidget {
 
 class _QRScannerPageState extends State<QRScannerPage> {
   MobileScannerController cameraController = MobileScannerController();
+
   bool isScanned = false;
+  bool isTorchOn = false;
+  String? lastScannedValue;
+  DateTime? lastScanTime;
+
+  @override
+  void dispose() {
+    cameraController.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (isScanned) return;
+
+    final List<Barcode> barcodes = capture.barcodes;
+    for (final barcode in barcodes) {
+      if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+        final now = DateTime.now();
+
+        // ป้องกันการสแกนซ้ำในเวลาสั้นๆ
+        if (lastScannedValue == barcode.rawValue &&
+            lastScanTime != null &&
+            now.difference(lastScanTime!).inSeconds < 2) {
+          return;
+        }
+
+        setState(() {
+          isScanned = true;
+          lastScannedValue = barcode.rawValue;
+          lastScanTime = now;
+        });
+
+        // หยุดการสแกนชั่วคราว
+        cameraController.stop();
+
+        // ส่งผลลัพธ์กลับ
+        Navigator.pop(context, barcode.rawValue);
+        break;
+      }
+    }
+  }
+
+  void _toggleTorch() async {
+    try {
+      await cameraController.toggleTorch();
+      setState(() {
+        isTorchOn = !isTorchOn;
+      });
+    } catch (e) {
+      print('Error toggling torch: $e');
+    }
+  }
+
+  void _switchCamera() async {
+    try {
+      await cameraController.switchCamera();
+    } catch (e) {
+      print('Error switching camera: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,56 +114,94 @@ class _QRScannerPageState extends State<QRScannerPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
+          // ปุ่มเปิด/ปิดไฟแฟลช
           IconButton(
             color: Colors.white,
-            icon: ValueListenableBuilder(
-              valueListenable: cameraController.torchState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case TorchState.off:
-                    return const Icon(Icons.flash_off, color: Colors.grey);
-                  case TorchState.on:
-                    return const Icon(Icons.flash_on, color: Colors.yellow);
-                }
-              },
+            icon: Icon(
+              isTorchOn ? Icons.flash_on : Icons.flash_off,
+              color: isTorchOn ? Colors.yellow : Colors.grey,
             ),
             iconSize: 32.0,
-            onPressed: () => cameraController.toggleTorch(),
+            onPressed: _toggleTorch,
           ),
+          // ปุ่มสลับกล้องหน้า/หลัง
           IconButton(
             color: Colors.white,
-            icon: ValueListenableBuilder(
-              valueListenable: cameraController.cameraFacingState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case CameraFacing.front:
-                    return const Icon(Icons.camera_front);
-                  case CameraFacing.back:
-                    return const Icon(Icons.camera_rear);
-                }
-              },
-            ),
+            icon: const Icon(Icons.switch_camera),
             iconSize: 32.0,
-            onPressed: () => cameraController.switchCamera(),
+            onPressed: _switchCamera,
           ),
         ],
       ),
-      body: MobileScanner(
-        controller: cameraController,
-        onDetect: (capture) {
-          if (!isScanned) {
-            final List<Barcode> barcodes = capture.barcodes;
-            for (final barcode in barcodes) {
-              if (barcode.rawValue != null) {
-                setState(() {
-                  isScanned = true;
-                });
-                Navigator.pop(context, barcode.rawValue);
-                break;
-              }
-            }
-          }
-        },
+      body: Stack(
+        children: [
+          // Camera Scanner
+          MobileScanner(controller: cameraController, onDetect: _onDetect),
+
+          // Scanning overlay
+          Container(
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.5)),
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: Container(color: Colors.black.withOpacity(0.5)),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: Container(color: Colors.black.withOpacity(0.5)),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.green, width: 2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Container(color: Colors.black.withOpacity(0.5)),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Container(color: Colors.black.withOpacity(0.5)),
+                ),
+              ],
+            ),
+          ),
+
+          // Status indicator when scanned
+          if (isScanned)
+            Container(
+              color: Colors.green.withOpacity(0.8),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white, size: 80),
+                    SizedBox(height: 16),
+                    Text(
+                      'สแกนสำเร็จ!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: Container(
         color: Colors.black,
@@ -104,7 +210,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'วางเลขบิล QR Code ในกรอบเพื่อสแกน',
+              'วาง QR Code ในกรอบเพื่อสแกน',
               style: TextStyle(color: Colors.white, fontSize: 16),
               textAlign: TextAlign.center,
             ),
@@ -126,6 +232,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     setState(() {
                       isScanned = false;
                     });
+                    cameraController.start();
                   },
                   icon: const Icon(Icons.refresh),
                   label: const Text('สแกนใหม่'),
@@ -140,11 +247,5 @@ class _QRScannerPageState extends State<QRScannerPage> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    cameraController.dispose();
-    super.dispose();
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import 'category_list_page.dart';
+import 'debug_scanner_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -303,6 +304,35 @@ class _SettingsPageState extends State<SettingsPage> {
                               context,
                               MaterialPageRoute(
                                 builder: (_) => const CategoryListPage(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Debug Section
+                  Card(
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.bug_report,
+                            color: Colors.purple,
+                          ),
+                          title: const Text('ทดสอบ Sunmi Scanner'),
+                          subtitle: const Text(
+                            'เครื่องมือสำหรับทดสอบการทำงานของสแกนเนอร์',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DebugScannerPage(),
                               ),
                             );
                           },
