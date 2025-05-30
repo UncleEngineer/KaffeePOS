@@ -42,7 +42,7 @@ dependencies:
   
   # Printer (Sunmi)
   sunmi_printer_plus: ^2.0.0
-  mobile_scanner: ^5.2.3
+  mobile_scanner: ^3.5.6 
   permission_handler: ^11.0.1
   sunmi_scanner: ^0.0.4
 
