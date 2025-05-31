@@ -380,6 +380,7 @@ class _SmartSyncPageState extends State<SmartSyncPage> {
                       if (_isUrlMode) ...[
                         TextFormField(
                           controller: _urlController,
+                          initialValue: 'https://raw.githubusercontent.com/UncleEngineer/KaffeePOS/refs/heads/main/examples_menu.json',
                           decoration: const InputDecoration(
                             labelText: 'URL',
                             hintText: 'https://example.com/products.json',

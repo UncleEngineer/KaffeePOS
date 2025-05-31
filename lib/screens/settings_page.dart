@@ -31,6 +31,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadSettings();
   }
 
+  
+
   @override
   void dispose() {
     _shopNameController.dispose();
