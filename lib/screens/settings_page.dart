@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import 'category_list_page.dart';
 import 'debug_scanner_page.dart';
+import 'smart_sync_page.dart'; // เพิ่มการ import
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -287,10 +288,32 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   const SizedBox(height: 16),
 
-                  // Category Management Section
+                  // Data Management Section
                   Card(
                     child: Column(
                       children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.sync_alt,
+                            color: Colors.purple,
+                          ),
+                          title: const Text('Smart Sync'),
+                          subtitle: const Text('นำเข้าข้อมูลสินค้าจาก URL หรือ JSON'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SmartSyncPage(),
+                              ),
+                            );
+                            // รีเฟรชหน้าหลังจากกลับมาจาก Smart Sync
+                            if (result == true) {
+                              _loadSettings();
+                            }
+                          },
+                        ),
+                        const Divider(height: 1),
                         ListTile(
                           leading: const Icon(
                             Icons.category,
@@ -321,7 +344,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ListTile(
                           leading: const Icon(
                             Icons.bug_report,
-                            color: Colors.purple,
+                            color: Colors.red,
                           ),
                           title: const Text('ทดสอบ Sunmi Scanner'),
                           subtitle: const Text(
